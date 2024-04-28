@@ -25,11 +25,17 @@
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="SeleniumAI" anchor="right" factoryClass="factories.MyToolWindowFactory" icon="AllIcons.Nodes.Aspect"/>
+
     </extensions>
     <actions>
-        <action id="actions.Hello" class="actions.Hello" text="HelloWorld" description="Say Hello">
+        <action id="actions.Selenium" class="actions.Selenium" text="HelloWorld" description="Say Hello">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+        </action>
+
+        <action id="actions.SearchGithubAction" class="actions.SearchGithubAction" text="Search Github" description="Search code snippets on Github repositories" icon="AllIcons.Vcs.Vendors.Github">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="$SearchWeb"/>
         </action>
     </actions>
 </idea-plugin>

@@ -19,6 +19,9 @@ intellij {
 
     plugins.set(listOf(/* Plugin Dependencies */))
 }
+dependencies {
+    implementation("org.seleniumhq.selenium:selenium-java:3.141.59")
+}
 
 tasks {
     // Set the JVM compatibility versions
