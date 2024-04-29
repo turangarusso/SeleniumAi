@@ -9,6 +9,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBList;
+import com.intellij.ui.content.Content;
+import com.intellij.ui.content.ContentFactory;
 import factories.MyToolWindowFactory;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -18,25 +22,24 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.logging.LoggingPreferences;
 import org.openqa.selenium.remote.CapabilityType;
 
+import javax.swing.*;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
 public class Selenium extends DumbAwareAction {
+    String methodUsed = "";
+
     @Override
     public void actionPerformed(com.intellij.openapi.actionSystem.AnActionEvent e) {
-        Project project = e.getProject();
-        if (project != null) {
-            ToolWindow myToolWindow = ToolWindowManager.getInstance(project).getToolWindow("SeleniumAI");
-            if (myToolWindow != null) {
-                myToolWindow.show(null);
-            }
-        }
-        System.out.println("Selenium AI Tool window opened!");
-
         Editor editor = e.getRequiredData(CommonDataKeys.EDITOR);
         CaretModel caretModel = editor.getCaretModel();
         String selectedText = caretModel.getCurrentCaret().getSelectedText();
+
+        if (selectedText == null || selectedText.isEmpty()) {
+            return;
+        }
 
         String url = Messages.showInputDialog(e.getProject(), "Please enter the website URL", "Website URL", Messages.getQuestionIcon());
 
@@ -51,13 +54,8 @@ public class Selenium extends DumbAwareAction {
 
             WebDriver driver = new ChromeDriver();
             System.out.println("Attempting to open URL: " + url);
-            String methodUsed = "";
             if (driver != null) {
                 System.out.println("Driver initialized successfully!");
-            }else {
-                System.out.println("Driver initialization failed!");
-                Messages.showMessageDialog(e.getProject(), "Please select the correct chrome driver path", "Error with Driver: ", Messages.getErrorIcon());
-                return;
             }
 
             if(url.startsWith("http://") || url.startsWith("https://")) {
@@ -76,69 +74,168 @@ public class Selenium extends DumbAwareAction {
                 }
             }
 
-            boolean elementExists = false;
+            var result = searchForElem(driver, selectedText, e);
 
-            try {
-                if (selectedText != null && !selectedText.isEmpty()) {
-                    if(selectedText.startsWith("#")) {
-                        methodUsed = "By.id( "+ selectedText.substring(1) +" )";
-                        elementExists = !driver.findElements(By.id(selectedText.substring(1))).isEmpty();
-                    } else if(selectedText.startsWith(".")) {
-                        methodUsed = "By.cssSelector( "+ selectedText.substring(1) +" )";
-                        elementExists = !driver.findElements(By.cssSelector(selectedText)).isEmpty();
-                    } else if(selectedText.startsWith("//") || selectedText.startsWith("./")){
-                        methodUsed = "By.xpath( " + selectedText.substring(1) + " )";
-                        elementExists = !driver.findElements(By.xpath(selectedText)).isEmpty();
-                    } else {
-                        methodUsed = "By.className( "+ selectedText.substring(1) +" )";
-                        elementExists = !driver.findElements(By.className(selectedText)).isEmpty();
+            if(!result) {
+                System.out.println("finding similar elements...");
+                var elements = findSimilar(driver, selectedText);
+                Project project = e.getProject();
+                if (project != null) {
+                    ToolWindow myToolWindow = ToolWindowManager.getInstance(project).getToolWindow("SeleniumAI");
+                    if (myToolWindow != null) {
+                        myToolWindow.show(null);
+                        JPanel panel = new JPanel(new BorderLayout());
+                        ContentFactory contentFactory = ContentFactory.getInstance();
+                        JBList<String> similarElementsList = new JBList<>(elements);
+                        panel.add(new JBLabel("Similar Elements: "), BorderLayout.NORTH);
+                        panel.add(new JScrollPane(similarElementsList), BorderLayout.CENTER);
+
+                        // Create new panel for JTextField and JButton
+                        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+
+                        JTextField textField = new JTextField(20);
+                        bottomPanel.add(textField);
+
+                        // create JButton
+                        JButton button = new JButton("Search css");
+                        bottomPanel.add(button);
+
+                        // add ActionListener at btn
+                        button.addActionListener(x -> {
+                            String text = textField.getText();
+                                var elementFound = searchForElem(driver, text, e);
+                                if (elementFound) {
+                                    myToolWindow.hide(null);
+                                    Messages.showMessageDialog(e.getProject(), "Method used: " + methodUsed, "Result", Messages.getInformationIcon());
+                                }
+                        });
+
+                        // add bottomPanel to panel
+                        panel.add(bottomPanel, BorderLayout.SOUTH);
+
+                        Content content = contentFactory.createContent(panel, "Elements", false);
+                        myToolWindow.getContentManager().addContent(content);
+
                     }
                 }
-            } catch (Exception ex) {
-                System.out.println("No elements found with this css");
-                findSimilar(driver, selectedText);
+            }else{
+                //If you find the element, close the driver
+                driver.quit();
             }
 
-            ArrayList<String> similarElements = new ArrayList<>();
-            similarElements.add("No similar elements found");
-            similarElements.add("No similar elements found2");
-
-            Messages.showMessageDialog(e.getProject(), "Method used: " + methodUsed, "Element exists: " + elementExists, Messages.getInformationIcon());
-            System.out.println("finding similar elements...");
-            findSimilar(driver, selectedText);
-
-            driver.quit();
+        }else{
+            Messages.showMessageDialog(e.getProject(), "Url cannot be null", "Error", Messages.getInformationIcon());
         }
     }
 
-    public void findSimilar(WebDriver driver, String selectedText) {
+    public boolean searchForElem(WebDriver driver, String selectedText, com.intellij.openapi.actionSystem.AnActionEvent e) {
+        boolean elementExists = false;
+
+        try {
+            if(selectedText.startsWith("#")) {
+                methodUsed = "By.id( "+ selectedText +" )";
+                elementExists = !driver.findElements(By.id(selectedText.substring(1))).isEmpty();
+            } else if(selectedText.startsWith(".")) {
+                methodUsed = "By.cssSelector( "+ selectedText +" )";
+                elementExists = !driver.findElements(By.cssSelector(selectedText)).isEmpty();
+            } else if(selectedText.startsWith("//") || selectedText.startsWith("./")){
+                methodUsed = "By.xpath( " + selectedText + " )";
+                elementExists = !driver.findElements(By.xpath(selectedText)).isEmpty();
+            } else {
+                methodUsed = "By.className( "+ selectedText +" )";
+                elementExists = !driver.findElements(By.className(selectedText)).isEmpty();
+            }
+        } catch (Exception ex) {
+            System.out.println("No elements found with this css");
+        }
+
+        if (!elementExists) {
+            try {
+                elementExists = !driver.findElements(By.id(selectedText)).isEmpty();
+                methodUsed = "By.id( " + selectedText + " )";
+            } catch (Exception ex) {
+                System.out.println("No elements found with this id");
+            }
+        }
+
+        if (!elementExists) {
+            try {
+                elementExists = !driver.findElements(By.tagName(selectedText)).isEmpty();
+                methodUsed = "By.tagName( " + selectedText + " )";
+            } catch (Exception ex) {
+                System.out.println("No elements found with this tagName");
+            }
+        }
+        if (!elementExists) {
+            try {
+                elementExists = !driver.findElements(By.name(selectedText)).isEmpty();
+                methodUsed = "By.name( " + selectedText + " )";
+            } catch (Exception ex) {
+                System.out.println("No elements found with this name");
+            }
+        }
+        if (!elementExists) {
+            try {
+                elementExists = !driver.findElements(By.xpath(selectedText)).isEmpty();
+                methodUsed = "By.xpath( " + selectedText + " )";
+            } catch (Exception ex) {
+                System.out.println("No elements found with this xpath");
+            }
+        }
+        if (!elementExists) {
+            try {
+                elementExists = !driver.findElements(By.linkText(selectedText)).isEmpty();
+                methodUsed = "By.linkText( " + selectedText + " )";
+            } catch (Exception ex) {
+                System.out.println("No elements found with this linkText");
+            }
+        }
+
+        if(elementExists) {
+            Messages.showMessageDialog(e.getProject(), "Method used: " + methodUsed, "Element exists: " + elementExists, Messages.getInformationIcon());
+            return true;
+        }else {
+            return false;
+        }
+    }
+
+    public ArrayList<String> findSimilar(WebDriver driver, String selectedText) {
         // Find similar elements
-        List<WebElement> allElements = driver.findElements(By.className("*"));
+
+        List<WebElement> allElements = driver.findElements(By.cssSelector("*"));
+        System.out.println("Elements found Size: " + allElements.size());
+
         ArrayList<String> similarElements = new ArrayList<>();
         for (WebElement element : allElements) {
             String elementClass = element.getAttribute("class");
-            if (elementClass != null && (elementClass.contains(selectedText) || calculateMatchPercentage(elementClass, selectedText) > 70)) {
-                similarElements.add(elementClass);
+            if (elementClass != null && (elementClass.contains(selectedText) || calculateMatchPercentage(element.getAttribute("class"), selectedText) > 50)) {
+                similarElements.add("ClassName: "+elementClass);
                 System.out.println("New similar element found: " + elementClass);
             }
-            if(element != null) {
+            if(element.getAttribute("id") != null) {
                 if (element.getAttribute("id") != null && (element.getAttribute("id").contains(selectedText) || calculateMatchPercentage(element.getAttribute("id"), selectedText) > 70)) {
-                    similarElements.add(element.getAttribute("id"));
-                }
-                if (element.getAttribute("name") != null && (element.getAttribute("name").contains(selectedText) || calculateMatchPercentage(element.getAttribute("name"), selectedText) > 70)){
-                    similarElements.add(element.getAttribute("name"));
-                }
-                if (element.getAttribute("value") != null && (element.getAttribute("value").contains(selectedText) || calculateMatchPercentage(element.getAttribute("value"), selectedText) > 70)){
-                    similarElements.add(element.getAttribute("value"));
-                }
-                if (element.getAttribute("placeholder") != null && (element.getAttribute("placeholder").contains(selectedText) || calculateMatchPercentage(element.getAttribute("placeholder"), selectedText) > 70)){
-                    similarElements.add(element.getAttribute("placeholder"));
+                    similarElements.add("id: "+element.getAttribute("id"));
+                    similarElements.add("Class (of element id "+element.getAttribute("id")+") is:"+element.getAttribute("class"));
                 }
             }
+//            if(element != null) {
+//                if (element.getAttribute("id") != null && (element.getAttribute("id").contains(selectedText) || calculateMatchPercentage(element.getAttribute("id"), selectedText) > 70)) {
+//                    similarElements.add("id: "+element.getAttribute("id"));
+//                }
+//                if (element.getAttribute("name") != null && (element.getAttribute("name").contains(selectedText) || calculateMatchPercentage(element.getAttribute("name"), selectedText) > 70)){
+//                    similarElements.add("name: "+element.getAttribute("name"));
+//                }
+//                if (element.getAttribute("value") != null && (element.getAttribute("value").contains(selectedText) || calculateMatchPercentage(element.getAttribute("value"), selectedText) > 70)){
+//                    similarElements.add("value: "+element.getAttribute("value"));
+//                }
+//                if (element.getAttribute("placeholder") != null && (element.getAttribute("placeholder").contains(selectedText) || calculateMatchPercentage(element.getAttribute("placeholder"), selectedText) > 70)){
+//                    similarElements.add("placeholder: "+element.getAttribute("placeholder"));
+//                }
+//            }
         }
         // Update the list in the tool window
-        MyToolWindowFactory myToolWindowFactory = new MyToolWindowFactory();
-        myToolWindowFactory.updateSimilarElementsList(similarElements);
+        return similarElements;
     }
 
     public static double calculateMatchPercentage(String str1, String str2) {

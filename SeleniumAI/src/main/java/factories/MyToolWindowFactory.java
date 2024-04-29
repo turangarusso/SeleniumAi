@@ -22,6 +22,23 @@ import java.util.ArrayList;
 public class MyToolWindowFactory implements ToolWindowFactory {
     DefaultListModel<String> listModel = new DefaultListModel<>();
 
+
+    // Aggiungi un campo statico per l'istanza singleton
+    private static MyToolWindowFactory instance;
+
+    // Rendi il costruttore privato per prevenire l'istanziazione diretta
+    private MyToolWindowFactory() {
+    }
+
+    // Aggiungi un metodo statico per ottenere l'istanza singleton
+    public static MyToolWindowFactory getInstance() {
+        if (instance == null) {
+            instance = new MyToolWindowFactory();
+        }
+        return instance;
+    }
+
+
     @Override
     public void createToolWindowContent(Project project, ToolWindow toolWindow) {
         JPanel panel = new JPanel(new BorderLayout());
@@ -43,7 +60,7 @@ public class MyToolWindowFactory implements ToolWindowFactory {
         panel.add(smallPanel, BorderLayout.NORTH);
 
         ContentFactory contentFactory = ContentFactory.getInstance();
-        Content content = contentFactory.createContent(panel, "", false);
+        Content content = contentFactory.createContent(panel, "Driver", false);
         toolWindow.getContentManager().addContent(content);
 
         // Add a JList to display the similar elements

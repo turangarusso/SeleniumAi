@@ -29,7 +29,7 @@
 
     </extensions>
     <actions>
-        <action id="actions.Selenium" class="actions.Selenium" text="HelloWorld" description="Say Hello">
+        <action id="actions.Selenium" class="actions.Selenium" text="Search CSS" description="Search element in web page" icon="AllIcons.Actions.Search">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
         </action>
