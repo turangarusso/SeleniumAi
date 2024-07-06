@@ -4,7 +4,7 @@
 This is a Alpha Project to create a Selenium Plugin for IntelliJ,
 you can search an element for css selector and the plugin will search it on the web page:
 
-If the element is present in the page
+If the element is present in the page:
 - Will return a true message
 
 If the element is Not present:
