@@ -14,4 +14,7 @@ Also you can search for snippet of code on github
 
 Next step will be integration of OpenAi to find elements on web page
 
+The original idea is to auto-heal the code for change elements that 
+are no more present on the web page, using Ai
+
 Project is in pause for the moment, so probably should be updated
